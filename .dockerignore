@@ -1,0 +1,11 @@
+# Keep the build context to what the image needs. The deny-list is Personal material
+# and never enters the image, even by accident (ticket #3).
+**
+!pyproject.toml
+!uv.lock
+!README.md
+!providers.yaml
+!src/
+!src/**
+**/__pycache__
+**/*.pyc

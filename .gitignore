@@ -1,0 +1,20 @@
+.venv/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+dist/
+
+# The Operator's deny-list, plain or hashed, never enters the repo.
+denylist.txt
+denylist.json
+
+# Proxy keys (hashed) and spend live on the VM, not in the repo.
+keys.yaml
+spend.db*
+
+# A local copy of the compose example and what it reads (README, "Quickstart"):
+# provider keys in .env, the Policy file and hashed files in config/.
+.env
+/docker-compose.yml
+/config/

@@ -1,0 +1,49 @@
+# An example of running the Privacy proxy in a container (README, "Quickstart").
+# As it stands it starts with nothing else: every Detector refuses, no Deny-list is
+# loaded and only the Subscription lane serves. Everything below is optional:
+#   - a Policy file, a Deny-list and the hashed proxy keys go in ./config, next to this
+#     file, and each is switched on by its variable under `environment`;
+#   - the API lane also needs the provider keys you use in the environment (one left
+#     unset makes that provider answer 503).
+# The log keeps metadata, never text.
+services:
+  privacy-proxy:
+    # The published image. Set PRIVACY_PROXY_IMAGE to an image you built
+    # (`docker build -t privacy-proxy:local .`).
+    image: ${PRIVACY_PROXY_IMAGE:-ghcr.io/mohashn/privacy-proxy:latest}
+    build: .
+    restart: unless-stopped
+    # On shutdown the proxy drains in-flight calls, then charges and logs the rest;
+    # a SIGKILL before that loses those charges.
+    stop_grace_period: 30s
+    environment:
+      # All optional: unset, every Detector refuses, no Deny-list is loaded and every
+      # proxy key is refused. Set one only once its file exists; a set path that
+      # can't be read stops startup.
+      # POLICY_PATH: /etc/privacy-proxy/policy.yaml
+      # DENYLIST_PATH: /etc/privacy-proxy/denylist.json
+      # The API lane: the hashed proxy keys, and the provider keys below.
+      # KEYS_PATH: /etc/privacy-proxy/keys.yaml
+      SPEND_DB_PATH: /var/lib/privacy-proxy/spend.db
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    ports:
+      # Loopback only: put a TLS proxy in front of it for anything else.
+      - "127.0.0.1:8787:8787"
+    volumes:
+      # The Policy file, the hashed keys and the Deny-list: on the host only, never in
+      # the image. Read-only; restart after a change. The container runs as uid 10001
+      # and must be able to read them.
+      - ./config:/etc/privacy-proxy:ro
+      # SQLite in WAL mode: the directory is writable, not only the file.
+      - spend:/var/lib/privacy-proxy
+    # A connect, not a request, since any request would be forwarded to the provider.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8787), 3)"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+
+volumes:
+  spend:

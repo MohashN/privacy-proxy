@@ -1,0 +1,79 @@
+# The API lane's providers: model-name prefix -> upstreams, the env var holding the
+# proxy's own key for it, and the price in USD per million tokens. The longest
+# matching entry wins; a model matches an entry only as that exact name or with a dated
+# snapshot suffix (`-YYYY-MM-DD`, `-YYYYMMDD`). Any other name, such as a `-pro` or
+# `-search-preview` variant, is refused unless listed by its own name, whatever a key lists.
+#
+# Which provider may see what is set by the models each proxy key lists, not here:
+# only a Trusted provider may receive context material.
+# Prices are illustrative, as read on the dates cited: check each provider's pricing
+# page before relying on them.
+# `trusted` marks a Trusted provider; every provider needs it, true or false, or the
+# proxy won't start. A request carrying any image or PDF to one that is not Trusted
+# is refused (`MEDIA_TO_UNTRUSTED`), since the proxy can't check all an image holds.
+#
+# `cache_read` and `cache_write` (the 5-minute tier) default to `in`; `cache_write_1h`
+# to `cache_write`. `long` holds the prices for a
+# prompt over `above` input tokens (cached ones included), where a model has them.
+# `web_search` is a provider's price per web search, where it has one.
+# `max_out` is the most output tokens the provider gives one answer, from its own
+# model documentation (cited per provider). An answer whose usage never arrives is
+# charged it when the request named no output bound. Every model needs one: the
+# proxy won't start without it.
+# `urls` gives the base URL per request format: `anthropic` (`/v1/messages` is added)
+# and `openai` (`/chat/completions` is added). A model is served only in the formats
+# its provider lists. `auth` is the header the provider reads its key from in the
+# Anthropic format: `x-api-key` (the default) or `bearer`; the OpenAI format is
+# always `bearer`. `betas` lists the `anthropic-beta` values a provider may be sent;
+# none by default, since a beta can switch on a feature billed outside these prices.
+providers:
+  anthropic:
+    trusted: true
+    # https://platform.claude.com/docs/en/about-claude/pricing, read 2026-10-26.
+    # Haiku 5.5 has its own prices for prompts over 100,000 tokens (`long`).
+    # max_out: "Max output 128K tokens" for each model (the Messages API limit; the
+    # 300k beta is for Batches only, which the lane doesn't serve), at
+    # https://platform.claude.com/docs/en/about-claude/models/overview, read 2026-10-27.
+    urls: {anthropic: https://api.anthropic.com}
+    key_env: ANTHROPIC_API_KEY
+    # USD per search for the web search tool ($10 per 1,000), on top of tokens.
+    web_search: 0.01
+    models:
+      claude-fable-5-1:
+        {in: 10.00, out: 50.00, cache_read: 0.25, cache_write: 12.50, cache_write_1h: 20.00,
+         max_out: 128000}
+      claude-opus-5-5:
+        {in: 4.00, out: 20.00, cache_read: 0.20, cache_write: 5.00, cache_write_1h: 8.00,
+         max_out: 128000}
+      claude-sonnet-5-5:
+        {in: 2.00, out: 10.00, cache_read: 0.10, cache_write: 2.50, cache_write_1h: 4.00,
+         max_out: 128000}
+      claude-haiku-5-5:
+        {in: 0.10, out: 0.50, cache_read: 0.01, cache_write: 0.125, cache_write_1h: 0.20,
+         max_out: 128000,
+         long: {above: 100000, in: 0.50, out: 2.50, cache_read: 0.05, cache_write: 0.625,
+                cache_write_1h: 1.00}}
+
+  openai:
+    trusted: true
+    # https://developers.openai.com/api/docs/pricing, read 2026-10-26: standard tier,
+    # with each model's prices for a prompt over 272,000 tokens (`long`). Only the
+    # current models: a shorter prefix like `gpt-5` would price `gpt-5.5-pro` at
+    # `gpt-5`'s rates. OpenAI serves the OpenAI format only.
+    # max_out: "128,000 max output tokens" on each model's own page,
+    # https://developers.openai.com/api/docs/models/MODEL, read 2026-10-27.
+    urls: {openai: https://api.openai.com/v1}
+    key_env: OPENAI_API_KEY
+    auth: bearer
+    models:
+      gpt-5.6-sol:
+        {in: 4.00, out: 20.00, cache_read: 0.40, max_out: 128000,
+         long: {above: 272000, in: 8.00, out: 30.00, cache_read: 0.80}}
+      gpt-5.6-terra:
+        {in: 2.00, out: 12.00, cache_read: 0.20, max_out: 128000,
+         long: {above: 272000, in: 4.00, out: 18.00, cache_read: 0.40}}
+      gpt-5.6-luna:
+        {in: 0.20, out: 1.20, cache_read: 0.02, max_out: 128000,
+         long: {above: 272000, in: 0.40, out: 1.80, cache_read: 0.04}}
+      gpt-5.4-mini: {in: 0.75, out: 4.50, cache_read: 0.075, max_out: 128000}
+      gpt-5.4-nano: {in: 0.20, out: 1.25, cache_read: 0.02, max_out: 128000}

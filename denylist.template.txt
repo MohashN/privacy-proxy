@@ -1,0 +1,24 @@
+# The Operator's deny-list for the Privacy proxy: what a request may never carry out.
+#
+# Copy this file somewhere outside any repo, write one entry per line, then hash it:
+#
+#     uv run privacy-proxy hash-denylist <your copy> <denylist.json>
+#
+# and point the proxy at the result with DENYLIST_PATH=<denylist.json>. Only the
+# hashed file goes to the proxy; keep or delete your copy, never commit it.
+#
+# What goes here: your family's names, your private address, anything else of yours
+# that a request must not carry. Not supplier or customer contacts: those are company
+# business. Personnummer, card numbers and IBANs need no entry; the proxy finds those
+# by their shape.
+#
+# How entries match:
+# - Case, accents, punctuation and symbols don't matter, and line breaks count as
+#   spaces: an entry "Anna-Karin Söderberg" matches "ANNA KARIN\nsoderberg" and
+#   "anna.karin+soderberg".
+# - An entry matches as whole words, at most 6 of them: write a street address and its
+#   postcode and town as separate lines if together they run longer.
+# - A single common word ("Anna") refuses every request that mentions it. Prefer full
+#   names.
+#
+# Lines starting with # and blank lines are ignored.

@@ -1,0 +1,10 @@
+[extend]
+useDefault = true
+
+# A public Anthropic beta-header constant, not a secret (generic-api-key false positive).
+[[allowlists]]
+description = "anthropic-beta header constant in the subscription-lane test"
+regexTarget = "line"
+condition = "AND"
+paths = ['''^tests/test_subscription_lane\.py$''']
+regexes = ['''oauth-2025-04-20,interleaved-thinking-2025-05-14''']

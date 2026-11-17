@@ -1,0 +1,38 @@
+# privacy-proxy Policy file. Point POLICY_PATH at a copy of this.
+# With no file, every Detector is on and refuses, as below.
+#
+# action: refuse  -> a hit refuses the whole request
+# action: mask    -> on the API lane (pp_ keys) the request goes on with each hit
+#                    replaced by a Placeholder such as <PHONE_NUMBER_1>, and the
+#                    reply keeps the Placeholder. The Subscription lane refuses
+#                    instead. A hit where no Placeholder can go (an id, a number,
+#                    a PDF) still refuses. Not for deny_list.
+# action: off     -> the Detector does not run
+detectors:
+  # National ID numbers, one Detector per country. Known countries:
+  #   SE, FI, DE, GB, US, PL, ES, IT, CA, AU, IN, KR, TH, TR, ZA, NG
+  # On by default: SE, FI, ES, IT, ZA, whose IDs don't read as code numbers. The
+  # others also read a bare 9- to 13-digit number (an id, a Unix timestamp) as an
+  # ID often enough to refuse coding traffic: US takes almost any 9 digits. Add a
+  # country only if your traffic carries few bare numbers of its ID's length, e.g.
+  #   countries: [SE, FI, ES, IT, ZA, DE]
+  national_id:
+    action: refuse
+    countries: [SE, FI, ES, IT, ZA]
+  # Phone numbers. With no regions, only numbers written with a "+" are read, for
+  # any country. Each listed region (ISO 3166 code, such as SE) adds that country's
+  # national format ("070-123 45 67").
+  # match: grouped -> only numbers written with a "+" or a separator (space,
+  #                   dash, brackets, dot); a bare run of digits never counts
+  # match: valid   -> any valid number, bare digit runs included
+  phone:
+    action: refuse
+    regions: []
+    match: grouped
+  card:
+    action: refuse
+  iban:
+    action: refuse
+  # With no deny-list loaded (DENYLIST_PATH unset) there is nothing to match.
+  deny_list:
+    action: refuse
