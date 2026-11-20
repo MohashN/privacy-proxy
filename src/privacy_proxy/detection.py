@@ -404,6 +404,39 @@ def recent_run_together(matched: str, today: date) -> bool:
     return date(today.year - 1, 1, 1) <= born <= today
 
 
+# What comes right before a GitHub id (#9): a JSON "id" or "<name>_id" key and
+# its colon, then only spaces; a comment, run, job, review or review-comment URL;
+# or "#<issue>/" as Salpline writes a comment.
+_ID_POSITION = re.compile(
+    r"""(?:"(?:[A-Za-z0-9_]*_)?id": *"""
+    r"|issuecomment-|/runs/|/jobs/|#pullrequestreview-|#discussion_r|#[0-9]+/)\Z"
+)
+# How far back a key is read: a longer one is never dropped.
+_ID_LOOKBACK = 64
+
+
+def known_id_position(text: str, start: int) -> bool:
+    """Whether a personnummer match at ``start`` sits where GitHub puts an id (#9).
+
+    GitHub's numeric ids now read as personnummer: about 5-6% of ids between
+    7.000 and 7.013 billion pass the date and Luhn check, as does about 1% of
+    11-digit Actions run ids, since only the last ten digits are checked. They
+    reach sessions in API output, URLs, CI logs and files, and each one refuses
+    its session on every later turn. Salpline's design (ShoVaz/salpline
+    ``arc/docs/design/github-id-refusals.md``, "The gateway carve-out") drops a
+    match in a position only an id takes: after a JSON ``"id":`` or
+    ``"<name>_id":`` with only spaces between, or right after ``issuecomment-``,
+    ``/runs/``, ``/jobs/``, ``#pullrequestreview-``, ``#discussion_r`` or
+    ``#<digits>/``. ``text`` is ``_presidio_view``'s, so a tab or no-break space
+    reads as a space.
+
+    Accepted: a real personnummer stored as a number under an ``"id"`` or
+    ``"<name>_id"`` key, or written after one of those URL pieces, passes. One in
+    a string value (``"id": "..."``), in prose or under any other key is refused.
+    """
+    return _ID_POSITION.search(text, max(0, start - _ID_LOOKBACK), start) is not None
+
+
 @dataclass(frozen=True)
 class _Found:
     """One Presidio or phone match on ``_presidio_view``'s text."""
@@ -1084,8 +1117,8 @@ class Scanner:
         """Each Presidio and phone match in ``text`` that counts, with its Detection.
 
         ``view`` is ``_presidio_view``'s, and the matches' offsets are its own. What
-        ``float_noise`` and ``recent_run_together`` let pass is not among them, so
-        what is masked is exactly what would refuse.
+        ``float_noise``, ``recent_run_together`` and ``known_id_position`` let pass
+        is not among them, so what is masked is exactly what would refuse.
         """
         fraction = _fraction_view(text)
         # One recogniser per call, so the deadline is read between them (#54): a
@@ -1115,6 +1148,8 @@ class Scanner:
             if result.entity_type in ("SE_PERSONNUMMER", PHONE) and recent_run_together(
                 matched, today
             ):
+                continue
+            if result.entity_type == "SE_PERSONNUMMER" and known_id_position(view, result.start):
                 continue
             if result.entity_type == "SE_PERSONNUMMER":
                 value = value[-10:]
