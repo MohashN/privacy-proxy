@@ -610,7 +610,20 @@ def test_id_without_a_json_colon_is_still_refused():
 def test_known_id_position_reads_what_comes_before_the_match(before, known):
     text = f"{before}{GITHUB_ID}"
 
-    assert known_id_position(text, len(before)) is known
+    assert known_id_position(text, len(before), len(text)) is known
+
+
+@pytest.mark.parametrize(
+    "written",
+    [
+        '{"id": 19121212-1212}',
+        "#1/121212-1212",
+        "actions/runs/121212+1212",
+        '"id": ７００７０７８１８６',  # fullwidth digits: not how GitHub writes an id
+    ],
+)
+def test_a_separated_or_non_ascii_number_in_an_id_position_is_still_refused(written):
+    assert [d.type for d in empty_list().inspect([written])] == ["SE_PERSONNUMMER"]
 
 
 # A listed number glued to other digits (#20): the deny-list looks it up inside
