@@ -13,6 +13,7 @@ from privacy_proxy.detection import (
     Denylist,
     Detection,
     Scanner,
+    known_id_position,
     normalise,
     read_entries,
     recent_run_together,
@@ -540,6 +541,89 @@ def test_a_cached_pass_is_checked_again_in_a_new_year(monkeypatch):
 )
 def test_recent_run_together_reads_the_date_from_the_digits(matched, recent):
     assert recent_run_together(matched, TODAY) is recent
+
+
+# GitHub's numeric ids that read as a personnummer (#9 in this repo; Salpline's
+# github-id-refusals design): a comment id dated 1970-07-07, and an 11-digit run
+# id whose last ten digits are that number.
+GITHUB_ID = "7007078186"
+RUN_ID = "47007078186"
+
+
+@pytest.mark.parametrize(
+    "written",
+    [
+        f'{{"id": {GITHUB_ID}}}',
+        f'"comment_id": {GITHUB_ID}',
+        f"issues/790#issuecomment-{GITHUB_ID}",
+        f"actions/runs/{RUN_ID}",
+        f"#790/{GITHUB_ID}",
+    ],
+)
+def test_a_github_id_in_a_known_id_position_passes(written):
+    assert empty_list().inspect([written]) == []
+
+
+def test_a_personnummer_after_pnr_is_still_refused():
+    assert [d.type for d in empty_list().inspect([f"pnr {GITHUB_ID}"])] == ["SE_PERSONNUMMER"]
+
+
+def test_a_look_alike_on_its_own_is_still_refused():
+    assert [d.type for d in empty_list().inspect([GITHUB_ID])] == ["SE_PERSONNUMMER"]
+
+
+def test_a_personnummer_under_a_personnummer_key_is_still_refused():
+    found = empty_list().inspect(['{"personnummer": "700707-8186"}'])
+
+    assert [d.type for d in found] == ["SE_PERSONNUMMER"]
+
+
+def test_id_without_a_json_colon_is_still_refused():
+    assert [d.type for d in empty_list().inspect([f"id {GITHUB_ID}"])] == ["SE_PERSONNUMMER"]
+
+
+@pytest.mark.parametrize(
+    ("before", "known"),
+    [
+        ('{"id": ', True),
+        ('"id":', True),
+        ('"id":   ', True),
+        ('"comment_id": ', True),
+        ('"check_suite_id": ', True),
+        ("issues/1#issuecomment-", True),
+        ("actions/runs/", True),
+        ("actions/runs/1/jobs/", True),
+        ("pull/2#pullrequestreview-", True),
+        ("pull/2#discussion_r", True),
+        ("#790/", True),
+        ('"id": "', False),  # a string value: a form field, not a GitHub id
+        ('"id":\n', False),  # only spaces between
+        ('"personnummer": ', False),
+        ('"valid": ', False),  # "_id", not any word ending in "id"
+        ("id ", False),
+        ("pnr ", False),
+        ("#/", False),  # no digits before the slash
+        ("issuecomment- ", False),  # directly after, no gap
+        ("", False),
+    ],
+)
+def test_known_id_position_reads_what_comes_before_the_match(before, known):
+    text = f"{before}{GITHUB_ID}"
+
+    assert known_id_position(text, len(before), len(text)) is known
+
+
+@pytest.mark.parametrize(
+    "written",
+    [
+        '{"id": 19121212-1212}',
+        "#1/121212-1212",
+        "actions/runs/121212+1212",
+        '"id": ７００７０７８１８６',  # fullwidth digits: not how GitHub writes an id
+    ],
+)
+def test_a_separated_or_non_ascii_number_in_an_id_position_is_still_refused(written):
+    assert [d.type for d in empty_list().inspect([written])] == ["SE_PERSONNUMMER"]
 
 
 # A listed number glued to other digits (#20): the deny-list looks it up inside

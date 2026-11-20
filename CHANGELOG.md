@@ -7,6 +7,15 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Fixed
+
+- **GitHub ids no longer refuse as personnummer.** A number that reads as a
+  personnummer is let through where only a GitHub id goes: after a JSON `"id":` or
+  `"<name>_id":` key, or right after `issuecomment-`, `/runs/`, `/jobs/`,
+  `#pullrequestreview-`, `#discussion_r` or `#<number>/`. Accepted: a real
+  personnummer stored as a number under such a key passes. Anywhere else, in a
+  string value, or under another key, it is still refused.
+
 ## [0.1.0] - 2026-11-17
 
 ### Added
