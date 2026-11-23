@@ -443,6 +443,58 @@ def known_id_position(text: str, start: int, end: int) -> bool:
     return _ID_POSITION.search(text, max(0, start - _ID_LOOKBACK), start) is not None
 
 
+# Four groups of four ASCII digits, one space between them.
+_FOUR_GROUPS = re.compile(r"[0-9]{4}(?: [0-9]{4}){3}")
+# The number right beside a match, across one separator a card may be written with.
+# Any Unicode digit, as Presidio reads them.
+_NUMBER_BEFORE = re.compile(r"(\d+)[ .-]\Z")
+_NUMBER_AFTER = re.compile(r"[ .-](\d+)")
+# How many numbers are read on each side of a list: a card of four groups overlaps
+# it by at most three.
+_LIST_NEIGHBOURS = 3
+# How far one is read: a longer one is never the next in a list.
+_NUMBER_LOOK = 16
+
+
+def consecutive_numbers(text: str, start: int, end: int) -> bool:
+    """Whether a card match is part of a list of consecutive numbers (#12).
+
+    Four issue numbers in a row ("4003 4004 4005 4006") are 16 digits in four
+    groups, and about one such list in ten passes the Luhn check. All of these hold,
+    or the match is still refused: it is four groups of four ASCII digits with one
+    space between them; each group is the one before plus one; and up to three
+    numbers on each side, across one space, "." or "-", carry the same list on,
+    until no number adjoins it. Another number there could be the rest of a card
+    that overlaps the list, which Presidio doesn't look for. ``text`` is
+    ``_fraction_view``'s: a tab or no-break space reads as a space, and a "." not.
+
+    Accepted, as decided on #12 (1B): a card whose four spaced groups ascend by one
+    passes. 903 such values are Luhn-valid and start as a card does.
+    """
+    if not _FOUR_GROUPS.fullmatch(text, start, end):
+        return False
+    first, *rest = (int(group) for group in text[start:end].split(" "))
+    if rest != [first + 1, first + 2, first + 3]:
+        return False
+    at = start
+    for step in range(1, _LIST_NEIGHBOURS + 1):
+        before = _NUMBER_BEFORE.search(text[max(0, at - _NUMBER_LOOK) : at])
+        if before is None:
+            break
+        if before[1] != str(first - step):
+            return False
+        at -= len(before[0])
+    at = end
+    for step in range(1, _LIST_NEIGHBOURS + 1):
+        after = _NUMBER_AFTER.match(text, at, at + _NUMBER_LOOK)
+        if after is None:
+            break
+        if after[1] != str(rest[-1] + step):
+            return False
+        at = after.end()
+    return True
+
+
 @dataclass(frozen=True)
 class _Found:
     """One Presidio or phone match on ``_presidio_view``'s text."""
@@ -1123,8 +1175,9 @@ class Scanner:
         """Each Presidio and phone match in ``text`` that counts, with its Detection.
 
         ``view`` is ``_presidio_view``'s, and the matches' offsets are its own. What
-        ``float_noise``, ``recent_run_together`` and ``known_id_position`` let pass
-        is not among them, so what is masked is exactly what would refuse.
+        ``float_noise``, ``consecutive_numbers``, ``recent_run_together`` and
+        ``known_id_position`` let pass is not among them, so what is masked is
+        exactly what would refuse.
         """
         fraction = _fraction_view(text)
         # One recogniser per call, so the deadline is read between them (#54): a
@@ -1144,6 +1197,10 @@ class Scanner:
         for result in results:
             _on_time(deadline)
             if result.entity_type in self._numbers and float_noise(
+                fraction, result.start, result.end
+            ):
+                continue
+            if result.entity_type == "CREDIT_CARD" and consecutive_numbers(
                 fraction, result.start, result.end
             ):
                 continue
