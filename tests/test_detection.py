@@ -1019,6 +1019,86 @@ def test_a_personnummer_behind_a_decimal_point_is_still_refused(written):
     assert [d.type for d in empty_list().inspect([written])] == ["SE_PERSONNUMMER"]
 
 
+# --- Four consecutive four-digit numbers are a list, not a card (#12) ---
+
+
+def test_a_loop_over_four_issue_numbers_passes():
+    # 4003 to 4006 pass the Luhn check; about one such list in ten does.
+    assert empty_list().inspect(["for n in 4003 4004 4005 4006; do"]) == []
+
+
+def test_no_card_is_hidden_behind_a_list():
+    card = "5500 0000 0000 0004"
+    passing = [
+        written
+        for length in range(4, 13)
+        for written in (
+            f"{' '.join(str(4003 + i) for i in range(length))} {card}",
+            f"{' '.join(str(4003 + i) for i in range(length))}-{card}",
+        )
+        if not empty_list().inspect([written])
+    ]
+
+    assert passing == []
+
+
+def test_a_list_too_long_to_read_to_its_end_is_refused():
+    written = " ".join(str(n) for n in range(4003, 4203))
+
+    assert {d.type for d in empty_list().inspect([written])} == {"CREDIT_CARD"}
+
+
+@pytest.mark.parametrize("length", [4, 5, 6, 8])
+def test_no_list_of_consecutive_four_digit_numbers_is_refused(length):
+    lists = [
+        " ".join(str(first + i) for i in range(length)) for first in range(1000, 10001 - length)
+    ]
+
+    # One text, a line each: a newline never joins two numbers into a card.
+    assert empty_list().inspect(["\n".join(lists)]) == []
+
+
+@pytest.mark.parametrize("space", ["\u00a0", "\t"])
+def test_a_list_with_another_space_passes(space):
+    # The check reads a no-break space or a tab as a space.
+    assert empty_list().inspect([space.join(["4003", "4004", "4005", "4006"])]) == []
+
+
+@pytest.mark.parametrize(
+    "written",
+    [
+        # Cards are written with dashes, dots or run together.
+        "4003-4004-4005-4006",
+        "4003.4004.4005.4006",
+        "4003400440054006",
+        "4003 4004 4005-4006",
+        # Ascending by one only.
+        "4111 1111 1111 1111",
+        # Another number right beside the list: a card could overlap its end.
+        "4003 4004 4005 4006 1111",
+        "4003 4004 4005 4006 1111 1111 1111",
+        "4003 4004 4005 4006.1111",
+        "4003 4004 4005 4006-1111",
+        "12 4003 4004 4005 4006",
+        "12.4003 4004 4005 4006",
+        "12-4003 4004 4005 4006",
+        # A neighbour that holds the next number but is longer.
+        "4003 4004 4005 4006 40071",
+        "14002 4003 4004 4005 4006",
+        # A neighbour in other digits than ASCII.
+        "4003 4004 4005 4006 \uff11\uff12\uff13",
+        # The list goes on, then something else: a card could start at 4005 or 4006.
+        "4003 4004 4005 4006 4007 1111 1111",
+        "4003 4004 4005 4006 4007 4008 1111",
+        # A card right after a longer list: the next match would straddle the two.
+        "4003 4004 4005 4006 4007 4008 4009 5500 0000 0000 0004",
+        "4003 4004 4005 4006 4007 4008 4009 4010 4011 5500 0000 0000 0004",
+    ],
+)
+def test_a_card_like_a_list_is_still_refused(written):
+    assert [d.type for d in empty_list().inspect([written])] == ["CREDIT_CARD"]
+
+
 # --- A listed phone written with Sweden's country code (#52) ---
 
 PLUS_46 = ["+46 70 123 45 67", "+46701234567", "0046 70 123 45 67"]

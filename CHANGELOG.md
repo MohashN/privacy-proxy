@@ -7,6 +7,15 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Fixed
+
+- **A list of four issue numbers no longer refuses as a card.** Four or more
+  consecutive four-digit numbers with one space between them ("4003 4004 4005
+  4006") pass, as long as no other number adjoins the list and
+  it is at most about a hundred long. Accepted: a card whose
+  four spaced groups ascend by one passes. Dashed, dotted and run-together forms
+  are still refused.
+
 ## [0.1.1] - 2026-11-20
 
 ### Fixed
