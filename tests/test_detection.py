@@ -1027,6 +1027,27 @@ def test_a_loop_over_four_issue_numbers_passes():
     assert empty_list().inspect(["for n in 4003 4004 4005 4006; do"]) == []
 
 
+def test_no_card_is_hidden_behind_a_list():
+    card = "5500 0000 0000 0004"
+    passing = [
+        written
+        for length in range(4, 13)
+        for written in (
+            f"{' '.join(str(4003 + i) for i in range(length))} {card}",
+            f"{' '.join(str(4003 + i) for i in range(length))}-{card}",
+        )
+        if not empty_list().inspect([written])
+    ]
+
+    assert passing == []
+
+
+def test_a_list_too_long_to_read_to_its_end_is_refused():
+    written = " ".join(str(n) for n in range(4003, 4203))
+
+    assert {d.type for d in empty_list().inspect([written])} == {"CREDIT_CARD"}
+
+
 @pytest.mark.parametrize("length", [4, 5, 6, 8])
 def test_no_list_of_consecutive_four_digit_numbers_is_refused(length):
     lists = [
@@ -1069,6 +1090,9 @@ def test_a_list_with_another_space_passes(space):
         # The list goes on, then something else: a card could start at 4005 or 4006.
         "4003 4004 4005 4006 4007 1111 1111",
         "4003 4004 4005 4006 4007 4008 1111",
+        # A card right after a longer list: the next match would straddle the two.
+        "4003 4004 4005 4006 4007 4008 4009 5500 0000 0000 0004",
+        "4003 4004 4005 4006 4007 4008 4009 4010 4011 5500 0000 0000 0004",
     ],
 )
 def test_a_card_like_a_list_is_still_refused(written):

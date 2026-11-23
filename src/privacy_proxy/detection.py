@@ -449,9 +449,9 @@ _FOUR_GROUPS = re.compile(r"[0-9]{4}(?: [0-9]{4}){3}")
 # Any Unicode digit, as Presidio reads them.
 _NUMBER_BEFORE = re.compile(r"(\d+)[ .-]\Z")
 _NUMBER_AFTER = re.compile(r"[ .-](\d+)")
-# How many numbers are read on each side of a list: a card of four groups overlaps
-# it by at most three.
-_LIST_NEIGHBOURS = 3
+# How many numbers are read on each side of a match before the list is too long to
+# let through: the time a match takes stays bounded (#54).
+_LIST_NEIGHBOURS = 100
 # How far one is read: a longer one is never the next in a list.
 _NUMBER_LOOK = 16
 
@@ -462,10 +462,11 @@ def consecutive_numbers(text: str, start: int, end: int) -> bool:
     Four issue numbers in a row ("4003 4004 4005 4006") are 16 digits in four
     groups, and about one such list in ten passes the Luhn check. All of these hold,
     or the match is still refused: it is four groups of four ASCII digits with one
-    space between them; each group is the one before plus one; and up to three
-    numbers on each side, across one space, "." or "-", carry the same list on,
-    until no number adjoins it. Another number there could be the rest of a card
-    that overlaps the list, which Presidio doesn't look for. ``text`` is
+    space between them; each group is the one before plus one; and every
+    number beside it, across one space, "." or "-", carries the same list on to both
+    its ends, at most ``_LIST_NEIGHBOURS`` each way. Any other number there could be
+    part of a card: Presidio's next match starts inside the list and can straddle
+    the list's end, which hides a card right after it. ``text`` is
     ``_fraction_view``'s: a tab or no-break space reads as a space, and a "." not.
 
     Accepted, as decided on #12 (1B): a card whose four spaced groups ascend by one
@@ -484,6 +485,8 @@ def consecutive_numbers(text: str, start: int, end: int) -> bool:
         if before[1] != str(first - step):
             return False
         at -= len(before[0])
+    else:
+        return False
     at = end
     for step in range(1, _LIST_NEIGHBOURS + 1):
         after = _NUMBER_AFTER.match(text, at, at + _NUMBER_LOOK)
@@ -492,6 +495,8 @@ def consecutive_numbers(text: str, start: int, end: int) -> bool:
         if after[1] != str(rest[-1] + step):
             return False
         at = after.end()
+    else:
+        return False
     return True
 
 
