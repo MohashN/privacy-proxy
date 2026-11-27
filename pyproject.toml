@@ -1,6 +1,6 @@
 [project]
 name = "privacy-proxy"
-version = "0.1.2"
+version = "0.1.3"
 description = "Inspects every request to a cloud model API and stops phone numbers, national IDs and other private data from leaving"
 readme = "README.md"
 license = "Apache-2.0"
