@@ -51,6 +51,7 @@ from concurrent.futures import TimeoutError as FutureTimeout
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
 from datetime import UTC, date, datetime
+from itertools import pairwise
 from pathlib import Path
 
 import phonenumbers
@@ -454,50 +455,63 @@ _NUMBER_AFTER = re.compile(r"[ .-](\d+)")
 _LIST_NEIGHBOURS = 100
 # How far one is read: a longer one is never the next in a list.
 _NUMBER_LOOK = 16
+# A number beside a list that may carry it on: one to four ASCII digits.
+_LISTED = re.compile(r"[0-9]{1,4}")
+# How far the last of any four numbers in a row may be above the first (#17).
+_ISSUE_SPAN = 64
+
+
+def _a_list(numbers: list[int]) -> bool:
+    """Whether ``numbers`` strictly ascend, any four in a row within ``_ISSUE_SPAN``."""
+    return all(a < b for a, b in pairwise(numbers)) and all(
+        last - first <= _ISSUE_SPAN for first, last in zip(numbers, numbers[3:])
+    )
 
 
 def consecutive_numbers(text: str, start: int, end: int) -> bool:
-    """Whether a card match is part of a list of consecutive numbers (#12).
+    """Whether a card match is part of a list of issue numbers (#12, #17).
 
-    Four issue numbers in a row ("4003 4004 4005 4006") are 16 digits in four
-    groups, and about one such list in ten passes the Luhn check. All of these hold,
-    or the match is still refused: it is four groups of four ASCII digits with one
-    space between them; each group is the one before plus one; and every
-    number beside it, across one space, "." or "-", carries the same list on to both
-    its ends, at most ``_LIST_NEIGHBOURS`` each way. Any other number there could be
-    part of a card: Presidio's next match starts inside the list and can straddle
-    the list's end, which hides a card right after it. ``text`` is
+    Four issue numbers in a row ("4003 4004 4005 4006", "1326 1327 1328 1331") are
+    16 digits in four groups, and about one such list in ten passes the Luhn check.
+    All of these hold, or the match is still refused: it is four groups of four
+    ASCII digits with one space between them; and with every number beside it,
+    across one space, "." or "-", read to both ends of the list, at most
+    ``_LIST_NEIGHBOURS`` each way, the numbers strictly ascend and any four in a
+    row span at most ``_ISSUE_SPAN``. A number beside the list that breaks it could
+    be part of a card: Presidio's next match starts inside the list and can
+    straddle the list's end, which hides a card right after it. ``text`` is
     ``_fraction_view``'s: a tab or no-break space reads as a space, and a "." not.
 
-    Accepted, as decided on #12 (1B): a card whose four spaced groups ascend by one
-    passes. 903 such values are Luhn-valid and start as a card does.
+    Accepted, as decided on #12 (1B) and widened on #17: a card whose four spaced
+    groups strictly ascend within ``_ISSUE_SPAN`` passes. About one random card in
+    tens of millions does.
     """
     if not _FOUR_GROUPS.fullmatch(text, start, end):
         return False
-    first, *rest = (int(group) for group in text[start:end].split(" "))
-    if rest != [first + 1, first + 2, first + 3]:
-        return False
+    numbers = [int(group) for group in text[start:end].split(" ")]
     at = start
-    for step in range(1, _LIST_NEIGHBOURS + 1):
+    for _ in range(_LIST_NEIGHBOURS):
         before = _NUMBER_BEFORE.search(text[max(0, at - _NUMBER_LOOK) : at])
         if before is None:
             break
-        if before[1] != str(first - step):
+        if not _LISTED.fullmatch(before[1]):
             return False
+        numbers.insert(0, int(before[1]))
         at -= len(before[0])
     else:
         return False
     at = end
-    for step in range(1, _LIST_NEIGHBOURS + 1):
+    for _ in range(_LIST_NEIGHBOURS):
         after = _NUMBER_AFTER.match(text, at, at + _NUMBER_LOOK)
         if after is None:
             break
-        if after[1] != str(rest[-1] + step):
+        if not _LISTED.fullmatch(after[1]):
             return False
+        numbers.append(int(after[1]))
         at = after.end()
     else:
         return False
-    return True
+    return _a_list(numbers)
 
 
 @dataclass(frozen=True)

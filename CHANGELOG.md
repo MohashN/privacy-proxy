@@ -7,6 +7,16 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Fixed
+
+- **A list of issue numbers with gaps no longer refuses as a card.** Four spaced
+  four-digit numbers that strictly ascend, the last at most 64 above the first
+  ("1326 1327 1328 1331"), pass; before, only numbers ascending by one did. A
+  longer list passes when every four in a row do, and as before only when no
+  other number adjoins it. Accepted: a card whose four spaced groups ascend
+  within 64 passes, about one random card in tens of millions. Descending,
+  repeated and far-apart groups are still refused.
+
 ## [0.1.2] - 2026-11-23
 
 ### Fixed
