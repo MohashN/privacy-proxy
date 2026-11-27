@@ -489,6 +489,8 @@ def consecutive_numbers(text: str, start: int, end: int) -> bool:
     if not _FOUR_GROUPS.fullmatch(text, start, end):
         return False
     numbers = [int(group) for group in text[start:end].split(" ")]
+    if not _a_list(numbers):
+        return False
     at = start
     for _ in range(_LIST_NEIGHBOURS):
         before = _NUMBER_BEFORE.search(text[max(0, at - _NUMBER_LOOK) : at])
@@ -497,6 +499,9 @@ def consecutive_numbers(text: str, start: int, end: int) -> bool:
         if not _LISTED.fullmatch(before[1]):
             return False
         numbers.insert(0, int(before[1]))
+        # Stop at the first number that breaks the list: the read stays short.
+        if not _a_list(numbers[:4]):
+            return False
         at -= len(before[0])
     else:
         return False
@@ -508,10 +513,12 @@ def consecutive_numbers(text: str, start: int, end: int) -> bool:
         if not _LISTED.fullmatch(after[1]):
             return False
         numbers.append(int(after[1]))
+        if not _a_list(numbers[-4:]):
+            return False
         at = after.end()
     else:
         return False
-    return _a_list(numbers)
+    return True
 
 
 @dataclass(frozen=True)

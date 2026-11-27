@@ -1091,6 +1091,19 @@ def test_no_card_is_hidden_beside_a_list_with_gaps(monkeypatch):
     assert passing == missed
 
 
+@pytest.mark.parametrize(("length", "refused"), [(103, False), (104, True)])
+def test_a_list_is_read_at_most_a_hundred_numbers_each_way(length, refused):
+    # A list of 104 holds a match with 100 numbers on one side.
+    written = " ".join(str(n) for n in range(4003, 4003 + length))
+
+    assert bool(empty_list().inspect([written])) is refused
+
+
+def test_a_neighbour_with_a_leading_zero_breaks_the_list():
+    # "0013" reads as 13: far below the list, so a card could overlap it.
+    assert [d.type for d in empty_list().inspect(["0013 1326 1327 1328 1331"])] == ["CREDIT_CARD"]
+
+
 @pytest.mark.parametrize("space", ["\u00a0", "\t"])
 def test_a_list_with_another_space_passes(space):
     # The check reads a no-break space or a tab as a space.
