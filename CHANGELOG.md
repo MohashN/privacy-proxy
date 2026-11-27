@@ -7,6 +7,8 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-11-27
+
 ### Fixed
 
 - **A list of issue numbers with gaps no longer refuses as a card.** Four spaced
