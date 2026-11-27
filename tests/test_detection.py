@@ -1058,6 +1058,52 @@ def test_no_list_of_consecutive_four_digit_numbers_is_refused(length):
     assert empty_list().inspect(["\n".join(lists)]) == []
 
 
+@pytest.mark.parametrize(
+    "written",
+    [
+        # A ticket's four blockers: 1326132713281331 passes the Luhn check (#17).
+        "for n in 1326 1327 1328 1331; do",
+        "1332 1335 1336 1337",
+        "1301 1310 1320 1350",
+        "1300 1301 1302 1364",
+        # The span is read over each four in a row, not over the whole list.
+        "1300 1326 1327 1328 1331 1360 1390",
+    ],
+)
+def test_ascending_issue_numbers_with_gaps_pass(written):
+    assert empty_list().inspect([written]) == []
+
+
+def test_no_card_is_hidden_beside_a_list_with_gaps(monkeypatch):
+    numbers = [1300, 1326, 1327, 1328, 1331, 1338, 1339, 1340, 1352, 1360]
+    card = "5500 0000 0000 0004"
+    texts = [
+        written
+        for length in range(4, len(numbers) + 1)
+        for listed in (" ".join(map(str, numbers[:length])),)
+        for written in (f"{listed} {card}", f"{listed}-{card}", f"{card} {listed}")
+    ]
+    passing = {written for written in texts if not empty_list().inspect([written])}
+    monkeypatch.setattr(detection, "consecutive_numbers", lambda *_: False)
+    # A card Presidio's scan misses whatever the list check says is not this check's.
+    missed = {written for written in texts if not empty_list().inspect([written])}
+
+    assert passing == missed
+
+
+@pytest.mark.parametrize(("length", "refused"), [(103, False), (104, True)])
+def test_a_list_is_read_at_most_a_hundred_numbers_each_way(length, refused):
+    # A list of 104 holds a match with 100 numbers on one side.
+    written = " ".join(str(n) for n in range(4003, 4003 + length))
+
+    assert bool(empty_list().inspect([written])) is refused
+
+
+def test_a_neighbour_with_a_leading_zero_breaks_the_list():
+    # "0013" reads as 13: far below the list, so a card could overlap it.
+    assert [d.type for d in empty_list().inspect(["0013 1326 1327 1328 1331"])] == ["CREDIT_CARD"]
+
+
 @pytest.mark.parametrize("space", ["\u00a0", "\t"])
 def test_a_list_with_another_space_passes(space):
     # The check reads a no-break space or a tab as a space.
@@ -1072,8 +1118,19 @@ def test_a_list_with_another_space_passes(space):
         "4003.4004.4005.4006",
         "4003400440054006",
         "4003 4004 4005-4006",
-        # Ascending by one only.
+        # Strictly ascending, and the last at most 64 above the first (#17).
         "4111 1111 1111 1111",
+        "4006 4005 4004 4003",
+        "4003 4004 4004 4007",
+        "1323 1349 1350 1388",
+        "1000 2000 3000 4000",
+        # Another number beside a list with gaps: a card could overlap its end (#17).
+        "1326 1327 1328 1331 1111",
+        "1326 1327 1328 1331-1111",
+        "12 1326 1327 1328 1331",
+        "1326 1327 1328 1331 13321",
+        "1326 1327 1328 1331 1340 1111 1111",
+        "1326 1327 1328 1331 1338 1339 1340 5500 0000 0000 0004",
         # Another number right beside the list: a card could overlap its end.
         "4003 4004 4005 4006 1111",
         "4003 4004 4005 4006 1111 1111 1111",
