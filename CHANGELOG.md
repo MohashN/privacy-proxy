@@ -7,6 +7,8 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-11-28
+
 ### Fixed
 
 - **A list of issue numbers followed by `2>&1` no longer refuses as a card.**
