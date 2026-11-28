@@ -459,6 +459,9 @@ _NUMBER_LOOK = 16
 _LISTED = re.compile(r"[0-9]{1,4}")
 # How far the last of any four numbers in a row may be above the first (#17).
 _ISSUE_SPAN = 64
+# A number after a list that ends no card: one or two ASCII digits, no more joined on
+# (#21). Presidio's card pattern ends in a group of three to five digits.
+_ENDS_NO_CARD = re.compile(r"[0-9]{1,2}(?![ .-]?\d)")
 
 
 def _a_list(numbers: list[int]) -> bool:
@@ -479,7 +482,10 @@ def consecutive_numbers(text: str, start: int, end: int) -> bool:
     ``_LIST_NEIGHBOURS`` each way, the numbers strictly ascend and any four in a
     row span at most ``_ISSUE_SPAN``. A number beside the list that breaks it could
     be part of a card: Presidio's next match starts inside the list and can
-    straddle the list's end, which hides a card right after it. ``text`` is
+    straddle the list's end, which hides a card right after it. One number does
+    not: one or two ASCII digits after the list with no more digits joined on across
+    one space, "." or "-" (the "2" of "2>&1", #21), since every card Presidio
+    matches ends in a group of three to five digits. ``text`` is
     ``_fraction_view``'s: a tab or no-break space reads as a space, and a "." not.
 
     Accepted, as decided on #12 (1B) and widened on #17: a card whose four spaced
@@ -510,12 +516,15 @@ def consecutive_numbers(text: str, start: int, end: int) -> bool:
         after = _NUMBER_AFTER.match(text, at, at + _NUMBER_LOOK)
         if after is None:
             break
-        if not _LISTED.fullmatch(after[1]):
-            return False
-        numbers.append(int(after[1]))
-        if not _a_list(numbers[-4:]):
-            return False
-        at = after.end()
+        if _LISTED.fullmatch(after[1]):
+            numbers.append(int(after[1]))
+            if _a_list(numbers[-4:]):
+                at = after.end()
+                continue
+        # The number breaks the list. One that ends no card ("2>&1") leaves it standing.
+        if _ENDS_NO_CARD.match(text, after.start(1)):
+            break
+        return False
     else:
         return False
     return True
