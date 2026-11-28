@@ -1110,6 +1110,32 @@ def test_a_list_with_another_space_passes(space):
     assert empty_list().inspect([space.join(["4003", "4004", "4005", "4006"])]) == []
 
 
+TICKETS = "1388 1389 1390 1391 1392 1393 1394 1395 1396 1397"
+
+
+@pytest.mark.parametrize(
+    "written",
+    [
+        f"salp tracker lint {TICKETS} 2>&1 | head -c 4000",
+        f"{TICKETS} 2>&1",
+        f"{TICKETS} 2",
+        f"{TICKETS} 12 >x",
+        "for n in 4003 4004 4005 4006; do echo $n; done 2>/dev/null",
+        "4003 4004 4005 4006 7.",
+    ],
+)
+def test_a_list_followed_by_a_number_too_short_to_end_a_card_passes(written):
+    # Presidio's card pattern ends in three to five digits: "2" of "2>&1" ends none (#21).
+    assert empty_list().inspect([written]) == []
+
+
+def test_a_card_after_a_list_is_still_refused_with_the_short_tail_rule():
+    # The card is 16 digits: far more than the one or two the short tail allows (#21).
+    written = "1388 1389 1390 1391 5500 0000 0000 0004"
+
+    assert {d.type for d in empty_list().inspect([written])} == {"CREDIT_CARD"}
+
+
 @pytest.mark.parametrize(
     "written",
     [
@@ -1150,6 +1176,15 @@ def test_a_list_with_another_space_passes(space):
         # A card right after a longer list: the next match would straddle the two.
         "4003 4004 4005 4006 4007 4008 4009 5500 0000 0000 0004",
         "4003 4004 4005 4006 4007 4008 4009 4010 4011 5500 0000 0000 0004",
+        # One or two digits end no card, unless more digits are joined on (#21).
+        "4003 4004 4005 4006 123",
+        "4003 4004 4005 4006 12 3456",
+        "4003 4004 4005 4006 12-34",
+        "4003 4004 4005 4006 1.5",
+        "4003 4004 4005 4006 2 4007",
+        "4003 4004 4005 4006 \uff11\uff12",
+        # Before the list, a short number still breaks it.
+        "2 4003 4004 4005 4006",
     ],
 )
 def test_a_card_like_a_list_is_still_refused(written):

@@ -7,6 +7,14 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Fixed
+
+- **A list of issue numbers followed by `2>&1` no longer refuses as a card.**
+  When the number after a list has one or two digits and no more digits are
+  joined to it ("… 1396 1397 2>&1", "… 1397 12 >x"), the list passes: no card
+  ends in a group that short. A longer number after the list, or one joined to
+  more digits, still refuses, and so does any number before the list.
+
 ## [0.1.3] - 2026-11-27
 
 ### Fixed
